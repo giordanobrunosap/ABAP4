@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class VehicleController : MonoBehaviour
 {
+    // PART1: DICHIARAZIONI E VARIABILI
+
     [Header("Wheels")]
     public Transform frontWheel;
     public Transform rearWheel;
@@ -11,24 +13,24 @@ public class VehicleController : MonoBehaviour
     public PhysicsMaterial2D wheelMaterial;
 
     [Header("Engine")]
-    public float motorForce = 1500f;
+    public float motorForce = 10000f;
     public float brakeForce = 1000f;
     public float maxSpeed = 20f;
     public float accelerationCurve = 1f;
 
     [Header("Body")]
-    public float vehicleMass = 1.5f;               // Ridotto per maggiore manovrabilità
-    public float vehicleLinearDrag = 0.05f;         // Ridotto per meno resistenza
-    public float vehicleAngularDrag = 1.0f;         // Aumentato per stabilità
+    public float vehicleMass = 4f;
+    public float vehicleLinearDrag = 0.1f;
+    public float vehicleAngularDrag = 0.5f;
     public float gravityScale = 1f;
-    public Vector2 centerOfMass = new Vector2(0, -0.1f); // Centro di massa equilibrato
+    public Vector2 centerOfMass = new Vector2(0, 0f);
 
     [Header("Suspension")]
-    [Range(0.1f, 10f)] public float suspensionStiffness = 4f;  // Valore equilibrato
-    [Range(0.1f, 5f)] public float suspensionDamping = 0.7f;   // Valore equilibrato 
-    [Range(0f, 10f)] public float suspensionFrequency = 4f;    // Valore equilibrato
+    [Range(0.1f, 10f)] public float suspensionStiffness = 5f;
+    [Range(0.1f, 5f)] public float suspensionDamping = 1.5f;
+    [Range(0f, 20f)] public float suspensionFrequency = 15f;
     public float suspensionAngle = 90f;
-    public float suspensionDistance = 0.3f;                    // Ridotto per stabilità
+    public float suspensionDistance = 0.4f;
 
     [Header("Collision")]
     public bool useContinuousCollision = true;
@@ -65,6 +67,7 @@ public class VehicleController : MonoBehaviour
     private float physicsTimestep = 0f;
     private int frameCounter = 0;
     private float timeCounter = 0f;
+
     // END PART1
     private void Awake()
     {
