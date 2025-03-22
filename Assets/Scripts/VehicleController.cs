@@ -3,7 +3,6 @@ using UnityEngine;
 public class VehicleController : MonoBehaviour
 {
     // PART1: DICHIARAZIONI E VARIABILI
-
     [Header("Wheels")]
     public Transform frontWheel;
     public Transform rearWheel;
@@ -13,22 +12,22 @@ public class VehicleController : MonoBehaviour
     public PhysicsMaterial2D wheelMaterial;
 
     [Header("Engine")]
-    public float motorForce = 10000f;
+    public float motorForce = 10000f;         // Aumentato da 5000f a 10000f
     public float brakeForce = 1000f;
     public float maxSpeed = 20f;
     public float accelerationCurve = 1f;
 
     [Header("Body")]
-    public float vehicleMass = 4f;
+    public float vehicleMass = 4f;            // Ridotto da 5f a 4f
     public float vehicleLinearDrag = 0.1f;
     public float vehicleAngularDrag = 0.5f;
     public float gravityScale = 1f;
-    public Vector2 centerOfMass = new Vector2(0, 0f);
+    public Vector2 centerOfMass = new Vector2(0, 0f);  // Modificato da -0.2f a 0f
 
     [Header("Suspension")]
     [Range(0.1f, 10f)] public float suspensionStiffness = 5f;
-    [Range(0.1f, 5f)] public float suspensionDamping = 1.5f;
-    [Range(0f, 20f)] public float suspensionFrequency = 15f;
+    [Range(0.1f, 5f)] public float suspensionDamping = 1.5f;  // Aumentato da 1f a 1.5f
+    [Range(0f, 20f)] public float suspensionFrequency = 15f;  // Aumentato da 5f a 15f
     public float suspensionAngle = 90f;
     public float suspensionDistance = 0.4f;
 
@@ -67,7 +66,6 @@ public class VehicleController : MonoBehaviour
     private float physicsTimestep = 0f;
     private int frameCounter = 0;
     private float timeCounter = 0f;
-
     // END PART1
     private void Awake()
     {
@@ -79,9 +77,14 @@ public class VehicleController : MonoBehaviour
         if (rearWheel != null) rearWheelCollider = rearWheel.GetComponent<CircleCollider2D>();
 
         // Apply initial settings
-        ApplyPhysicsSettings();
+        // Inizializza sempre il motore
+        if (rearWheelJoint != null) rearWheelJoint.useMotor = true;
+
         UpdateSuspension();
         UpdateWheelProperties();
+
+        // Aggiungi verifica dei riferimenti
+        CheckReferences();
     }
 
     private void Start()
@@ -92,37 +95,28 @@ public class VehicleController : MonoBehaviour
         if (rearWheelJoint == null)
             Debug.LogError("Manca il WheelJoint2D posteriore!");
 
-        // Applica impostazioni bilanciate iniziali    
-        ApplyBalancedSettings();
-
         Time.fixedDeltaTime = 0.01f; // 100Hz physics as default
         physicsTimestep = Time.fixedDeltaTime;
-    }
 
-    private void ApplyBalancedSettings()
-    {
-        // Impostazioni di equilibratura base
-        rb.mass = vehicleMass;
-        rb.centerOfMass = centerOfMass;
-        rb.drag = vehicleLinearDrag;
-        rb.angularDrag = vehicleAngularDrag;
-
-        // Assicura che entrambe le ruote abbiano impostazioni identiche
-        if (frontWheelJoint != null && rearWheelJoint != null)
+        // Applica le impostazioni fisiche qui
+        if (rb != null)
         {
-            // Impostazioni delle sospensioni equilibrate
-            JointSuspension2D suspension = new JointSuspension2D();
-            suspension.dampingRatio = suspensionDamping;
-            suspension.frequency = suspensionFrequency;
-            suspension.angle = suspensionAngle;
-
-            frontWheelJoint.suspension = suspension;
-            rearWheelJoint.suspension = suspension;
+            rb.mass = vehicleMass;
+            rb.drag = vehicleLinearDrag;
+            rb.angularDrag = vehicleAngularDrag;
+            rb.gravityScale = gravityScale;
+            rb.centerOfMass = centerOfMass;
         }
 
+        // Applica nuovamente le impostazioni di sospensione per sicurezza
         UpdateSuspension();
-        ApplyPhysicsSettings();
-        UpdateWheelProperties();
+
+        // Assicurati che il motore sia attivato all'inizio
+        if (rearWheelJoint != null)
+        {
+            rearWheelJoint.useMotor = true;
+            Debug.Log("Motore attivato in Start()");
+        }
     }
 
     private void Update()
@@ -153,19 +147,62 @@ public class VehicleController : MonoBehaviour
             {
                 accelerationInput = -1.0f;  // Valore negativo per andare a destra
                 lastInputLog = "DESTRA premuto: " + Time.time;
+                Debug.Log("Input destro registrato: " + accelerationInput);
+
+                // Applicazione diretta per assicurarsi che funzioni
+                if (rearWheelJoint != null)
+                {
+                    JointMotor2D motor = rearWheelJoint.motor;
+                    motor.motorSpeed = -maxSpeed * 5000f;
+                    motor.maxMotorTorque = motorForce;
+                    rearWheelJoint.motor = motor;
+                    rearWheelJoint.useMotor = true;
+                    Debug.Log("APPLICAZIONE DIRETTA FORZA DESTRA");
+                }
             }
             // A/Left va a sinistra (valore positivo per il motore)
             else if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
             {
                 accelerationInput = 1.0f;  // Valore positivo per andare a sinistra
                 lastInputLog = "SINISTRA premuto: " + Time.time;
+                Debug.Log("Input sinistro registrato: " + accelerationInput);
+
+                // Applicazione diretta per assicurarsi che funzioni
+                if (rearWheelJoint != null)
+                {
+                    JointMotor2D motor = rearWheelJoint.motor;
+                    motor.motorSpeed = maxSpeed * 5000f;
+                    motor.maxMotorTorque = motorForce;
+                    rearWheelJoint.motor = motor;
+                    rearWheelJoint.useMotor = true;
+                    Debug.Log("APPLICAZIONE DIRETTA FORZA SINISTRA");
+                }
             }
             else
             {
                 accelerationInput = 0f;  // Nessun input
+
+                // Ferma il motore quando non ci sono input
+                if (rearWheelJoint != null)
+                {
+                    JointMotor2D motor = rearWheelJoint.motor;
+                    motor.motorSpeed = 0f;
+                    motor.maxMotorTorque = 0.1f;
+                    rearWheelJoint.motor = motor;
+                    rearWheelJoint.useMotor = true;
+                }
             }
 
             brakeInput = Input.GetKey(KeyCode.Space) ? 1.0f : 0.0f;
+            if (brakeInput > 0 && rearWheelJoint != null)
+            {
+                JointMotor2D motor = rearWheelJoint.motor;
+                motor.motorSpeed = 0f;
+                motor.maxMotorTorque = brakeForce;
+                rearWheelJoint.motor = motor;
+                rearWheelJoint.useMotor = true;
+                Debug.Log("FRENO APPLICATO");
+            }
         }
 
         // UI toggles
@@ -201,18 +238,24 @@ public class VehicleController : MonoBehaviour
         Time.fixedDeltaTime = physicsTimestep;
     }
 
+    // END PART2
+
+    // PART3: FISICA E MOVIMENTO
+
     private void FixedUpdate()
     {
-        // Apply motor force
-        ApplyMotorForce();
+        // Non chiamiamo più ApplyMotorForce() perché ora applichiamo direttamente in Update
+        Debug.Log("FixedUpdate chiamato");
     }
-    //END PART2
+
     private void ApplyMotorForce()
     {
+        // Questo metodo rimane per compatibilità ma non lo usiamo più direttamente
+        Debug.Log("ApplyMotorForce chiamato. Input: " + accelerationInput);
+
         if (rearWheelJoint != null)
         {
             JointMotor2D motor = rearWheelJoint.motor;
-
             if (accelerationInput > 0)
             {
                 // Accelerate left (A/Left) - direzione corretta
@@ -224,6 +267,7 @@ public class VehicleController : MonoBehaviour
                 }
                 motor.motorSpeed = speed;
                 motor.maxMotorTorque = motorForce;
+                Debug.Log("Applicando forza sinistra: " + speed);
             }
             else if (accelerationInput < 0)
             {
@@ -236,6 +280,7 @@ public class VehicleController : MonoBehaviour
                 }
                 motor.motorSpeed = speed;
                 motor.maxMotorTorque = motorForce;
+                Debug.Log("Applicando forza destra: " + speed);
             }
             else if (brakeInput > 0)
             {
@@ -249,21 +294,111 @@ public class VehicleController : MonoBehaviour
                 motor.motorSpeed = 0;
                 motor.maxMotorTorque = 0.1f;
             }
-
             rearWheelJoint.motor = motor;
-            rearWheelJoint.useMotor = true;
+            rearWheelJoint.useMotor = true;  // Assicurati che questa riga sia presente
+        }
+        else
+        {
+            Debug.LogError("rearWheelJoint is null!");
+        }
+    }
+    //END PART2
+    private void FixedUpdate()
+    {
+        // Apply motor force
+        ApplyMotorForce();
+
+        // Debug per verificare se FixedUpdate viene chiamato
+        Debug.Log("FixedUpdate chiamato");
+    }
+
+    private void ApplyMotorForce()
+    {
+        Debug.Log("ApplyMotorForce chiamato. Input: " + accelerationInput);
+
+        if (rearWheelJoint != null)
+        {
+            JointMotor2D motor = rearWheelJoint.motor;
+            if (accelerationInput > 0)
+            {
+                // Accelerate left (A/Left) - direzione corretta
+                float speed = maxSpeed * 5000f;
+                // Apply acceleration curve if configured
+                if (accelerationCurve != 1f)
+                {
+                    speed *= Mathf.Pow(Mathf.Abs(accelerationInput), accelerationCurve);
+                }
+                motor.motorSpeed = speed;
+                motor.maxMotorTorque = motorForce;
+                Debug.Log("Applicando forza sinistra: " + speed);
+            }
+            else if (accelerationInput < 0)
+            {
+                // Accelerate right (D/Right) - direzione corretta
+                float speed = -maxSpeed * 5000f;
+                // Apply acceleration curve if configured
+                if (accelerationCurve != 1f)
+                {
+                    speed *= Mathf.Pow(Mathf.Abs(accelerationInput), accelerationCurve);
+                }
+                motor.motorSpeed = speed;
+                motor.maxMotorTorque = motorForce;
+                Debug.Log("Applicando forza destra: " + speed);
+            }
+            else if (brakeInput > 0)
+            {
+                // Brake (Space)
+                motor.motorSpeed = 0;
+                motor.maxMotorTorque = brakeForce;
+            }
+            else
+            {
+                // Coast with very minimal resistance
+                motor.motorSpeed = 0;
+                motor.maxMotorTorque = 0.1f;
+            }
+            rearWheelJoint.motor = motor;
+            rearWheelJoint.useMotor = true;  // Assicurati che questa riga sia presente
+        }
+        else
+        {
+            Debug.LogError("rearWheelJoint is null!");
         }
     }
 
+    // Metodo per verificare se il veicolo è a contatto con il terreno
     private bool IsGrounded()
     {
-        float rayDistance = suspensionDistance;
-        bool frontGrounded = Physics2D.Raycast(frontWheel.position, Vector2.down, rayDistance, groundLayer);
-        bool rearGrounded = Physics2D.Raycast(rearWheel.position, Vector2.down, rayDistance, groundLayer);
+        // Verifica se le ruote stanno toccando il terreno
+        bool frontWheelGrounded = false;
+        bool rearWheelGrounded = false;
 
-        return frontGrounded || rearGrounded;
+        if (frontWheelCollider != null)
+        {
+            // Crea un piccolo cerchio di collisione sotto la ruota anteriore
+            Collider2D[] colliders = Physics2D.OverlapCircleAll(
+                frontWheel.position - new Vector3(0, wheelRadius * 0.5f, 0),
+                collisionDetectionRadius,
+                groundLayer
+            );
+            frontWheelGrounded = colliders.Length > 0;
+        }
+
+        if (rearWheelCollider != null)
+        {
+            // Crea un piccolo cerchio di collisione sotto la ruota posteriore
+            Collider2D[] colliders = Physics2D.OverlapCircleAll(
+                rearWheel.position - new Vector3(0, wheelRadius * 0.5f, 0),
+                collisionDetectionRadius,
+                groundLayer
+            );
+            rearWheelGrounded = colliders.Length > 0;
+        }
+
+        return frontWheelGrounded || rearWheelGrounded;
     }
 
+    // Metodo per applicare le impostazioni fisiche al Rigidbody
     private void ApplyPhysicsSettings()
     {
         if (rb != null)
@@ -273,35 +408,97 @@ public class VehicleController : MonoBehaviour
             rb.angularDrag = vehicleAngularDrag;
             rb.gravityScale = gravityScale;
             rb.centerOfMass = centerOfMass;
-            rb.collisionDetectionMode = useContinuousCollision ?
-                CollisionDetectionMode2D.Continuous : CollisionDetectionMode2D.Discrete;
+        }
+        else
+        {
+            Debug.LogError("Rigidbody2D non trovato durante ApplyPhysicsSettings");
         }
     }
 
+    // Metodo per aggiornare le proprietà delle ruote
     private void UpdateWheelProperties()
     {
-        UpdateWheelCollider(frontWheelCollider);
-        UpdateWheelCollider(rearWheelCollider);
+        // Aggiorna le proprietà delle ruote se necessario
+        if (frontWheelCollider != null && wheelRadius > 0)
+        {
+            frontWheelCollider.radius = wheelRadius;
+            if (wheelMaterial != null) frontWheelCollider.sharedMaterial = wheelMaterial;
+        }
+
+        if (rearWheelCollider != null && wheelRadius > 0)
+        {
+            rearWheelCollider.radius = wheelRadius;
+            if (wheelMaterial != null) rearWheelCollider.sharedMaterial = wheelMaterial;
+        }
     }
 
-    private void UpdateWheelCollider(CircleCollider2D collider)
+    // Metodo per applicare tutte le impostazioni in una volta sola
+    private void ApplyAllSettings()
     {
-        if (collider != null)
-        {
-            collider.radius = wheelRadius;
+        // Applica tutte le impostazioni in una volta sola
+        ApplyPhysicsSettings();
+        UpdateSuspension();
+        UpdateWheelProperties();
 
-            if (wheelMaterial != null)
-            {
-                collider.sharedMaterial = wheelMaterial;
-            }
-            else
-            {
-                // Create dynamic material if none assigned
-                PhysicsMaterial2D material = new PhysicsMaterial2D("WheelMaterial");
-                material.friction = friction;
-                material.bounciness = bounciness;
-                collider.sharedMaterial = material;
-            }
+        Debug.Log("Tutte le impostazioni applicate");
+    }
+
+    // Metodo per applicare impostazioni preimpostate equilibrate
+    private void ApplyBalancedSettings()
+    {
+        // Impostazioni equilibrate per un comportamento stabile del veicolo
+
+        // Corpo del veicolo
+        vehicleMass = 4f;
+        vehicleLinearDrag = 0.1f;
+        vehicleAngularDrag = 0.5f;
+        gravityScale = 1f;
+        centerOfMass = new Vector2(0, 0f);
+
+        // Sospensioni
+        suspensionFrequency = 15f;
+        suspensionDamping = 1.5f;
+        suspensionAngle = 90f;
+
+        // Motore
+        motorForce = 10000f;
+        brakeForce = 1000f;
+
+        // Applica le nuove impostazioni
+        ApplyAllSettings();
+
+        Debug.Log("Impostazioni equilibrate applicate");
+    }
+
+    // Metodo per resettare il veicolo alla posizione iniziale
+    private void ResetVehicle()
+    {
+        if (rb != null)
+        {
+            // Ferma il movimento
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+
+            // Ripristina la posizione e rotazione iniziale
+            // Puoi personalizzare questi valori in base alle tue esigenze
+            rb.position = new Vector2(0, 0);
+            rb.rotation = 0f;
+
+            Debug.Log("Veicolo resettato alla posizione iniziale");
+        }
+    }
+
+    // Aggiungiamo un metodo per verificare i riferimenti all'avvio
+    private void CheckReferences()
+    {
+        if (frontWheel == null || rearWheel == null)
+        {
+            Debug.LogError("Wheel references are missing");
+        }
+
+        if (frontWheelJoint == null || rearWheelJoint == null)
+        {
+            Debug.LogError("WheelJoint references are missing");
         }
     }
 
@@ -309,49 +506,22 @@ public class VehicleController : MonoBehaviour
     {
         if (frontWheelJoint != null)
         {
-            JointSuspension2D suspension = frontWheelJoint.suspension;
-            suspension.dampingRatio = suspensionDamping;
-            suspension.frequency = suspensionFrequency;
-            suspension.angle = suspensionAngle;
-            frontWheelJoint.suspension = suspension;
-
-            // Additionally set the connectedAnchor distance if the joint supports it
-            frontWheelJoint.connectedAnchor = new Vector2(
-                frontWheelJoint.connectedAnchor.x,
-                suspensionDistance
-            );
+            JointSuspension2D frontSuspension = frontWheelJoint.suspension;
+            frontSuspension.frequency = suspensionFrequency;
+            frontSuspension.dampingRatio = suspensionDamping;
+            frontSuspension.angle = suspensionAngle;
+            frontWheelJoint.suspension = frontSuspension;
+            Debug.Log("Suspension updated: Frequency=" + suspensionFrequency + ", Damping=" + suspensionDamping);
         }
 
         if (rearWheelJoint != null)
         {
-            JointSuspension2D suspension = rearWheelJoint.suspension;
-            suspension.dampingRatio = suspensionDamping;
-            suspension.frequency = suspensionFrequency;
-            suspension.angle = suspensionAngle;
-            rearWheelJoint.suspension = suspension;
-
-            // Additionally set the connectedAnchor distance if the joint supports it
-            rearWheelJoint.connectedAnchor = new Vector2(
-                rearWheelJoint.connectedAnchor.x,
-                suspensionDistance
-            );
+            JointSuspension2D rearSuspension = rearWheelJoint.suspension;
+            rearSuspension.frequency = suspensionFrequency;
+            rearSuspension.dampingRatio = suspensionDamping;
+            rearSuspension.angle = suspensionAngle;
+            rearWheelJoint.suspension = rearSuspension;
         }
-    }
-
-    private void ResetVehicle()
-    {
-        transform.position = new Vector3(0, 3, 0);
-        transform.rotation = Quaternion.identity;
-        rb.velocity = Vector2.zero;
-        rb.angularVelocity = 0;
-        rb.WakeUp();
-    }
-
-    private void ApplyAllSettings()
-    {
-        ApplyPhysicsSettings();
-        UpdateSuspension();
-        UpdateWheelProperties();
     }
     //END PART3
     private void OnGUI()
